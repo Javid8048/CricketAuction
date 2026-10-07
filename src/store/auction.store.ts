@@ -4,6 +4,8 @@ import { AuctionState, Player, Team, Bid } from '../types';
 import { socketService } from '../services/socket';
 import { api } from '../services/api';
 import { sound } from '../utils/sound';
+import { INITIAL_TEAMS, INITIAL_PLAYERS } from '../data/initial-data';
+import { getMinBidIncrement } from '../utils/currency';
 
 interface SoldOverlay {
   player: Player;
@@ -24,6 +26,7 @@ interface AuctionStore {
   isTimerWarning: boolean;
   isTimerUrgent: boolean;
   isConnected: boolean;
+  isStandaloneMode: boolean;
   isBidding: boolean;
   lastBidFlash: boolean;
   soldOverlay: SoldOverlay | null;
@@ -38,7 +41,12 @@ interface AuctionStore {
   dismissOverlay: () => void;
   toggleSound: () => void;
   showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
+  startStandaloneTimer: () => void;
+  stopStandaloneTimer: () => void;
+  adminActionStandalone: (action: string, payload?: any) => Promise<void>;
 }
+
+let standaloneInterval: any = null;
 
 export const useAuctionStore = create<AuctionStore>((set, get) => ({
   state: null,
@@ -46,6 +54,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
   isTimerWarning: false,
   isTimerUrgent: false,
   isConnected: false,
+  isStandaloneMode: false,
   isBidding: false,
   lastBidFlash: false,
   soldOverlay: null,
@@ -72,15 +81,82 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     set({ soundMuted: next });
   },
 
+  startStandaloneTimer: () => {
+    if (standaloneInterval) clearInterval(standaloneInterval);
+    standaloneInterval = setInterval(() => {
+      const { secondsLeft, state } = get();
+      if (!state || state.auction.status !== 'ACTIVE') return;
+
+      const nextSec = secondsLeft - 1;
+      set({
+        secondsLeft: nextSec,
+        isTimerWarning: nextSec <= 5 && nextSec > 0,
+        isTimerUrgent: nextSec <= 3 && nextSec > 0,
+      });
+
+      if (nextSec === 5 || nextSec === 4) sound.playTimerTick();
+      if (nextSec <= 3 && nextSec > 0) sound.playTimerUrgent();
+
+      if (nextSec <= 0) {
+        clearInterval(standaloneInterval);
+        standaloneInterval = null;
+        if (state.highestBidTeam) {
+          get().adminActionStandalone('sell');
+        } else {
+          get().adminActionStandalone('unsold');
+        }
+      }
+    }, 1000);
+  },
+
+  stopStandaloneTimer: () => {
+    if (standaloneInterval) {
+      clearInterval(standaloneInterval);
+      standaloneInterval = null;
+    }
+  },
+
   initState: async () => {
     try {
       const data = await api.getCurrentAuction();
       set({
         state: data,
         secondsLeft: data.auction?.secondsLeft ?? 10,
+        isConnected: true,
+        isStandaloneMode: false,
       });
     } catch (err: any) {
-      console.error('Error fetching initial auction state:', err);
+      console.warn('Backend server offline. Enabling Standalone Live Simulation Engine on GitHub Pages!');
+      // Initialize standalone client-side engine with rich teams and players
+      const activeP = INITIAL_PLAYERS[0];
+      const defaultState: AuctionState = {
+        auction: {
+          id: 'auction-mega-2026',
+          name: 'Premier Cricket Mega Auction 2026',
+          status: 'ACTIVE',
+          currentRound: 1,
+          defaultTimerSec: 10,
+          activePlayerId: activeP.id,
+          activePlayerPrice: activeP.basePrice,
+          highestBidTeamId: null,
+          secondsLeft: 10,
+        },
+        activePlayer: activeP,
+        highestBidTeam: null,
+        currentBid: activeP.basePrice,
+        teams: INITIAL_TEAMS,
+        recentBids: [],
+        minIncrement: getMinBidIncrement(activeP.basePrice),
+      };
+
+      set({
+        state: defaultState,
+        secondsLeft: 10,
+        isConnected: true, // Connected to internal simulation engine
+        isStandaloneMode: true,
+      });
+
+      get().startStandaloneTimer();
     }
   },
 
@@ -88,11 +164,13 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
     const socket = socketService.connect();
 
     socket.on('connect', () => {
-      set({ isConnected: true });
+      set({ isConnected: true, isStandaloneMode: false });
     });
 
     socket.on('disconnect', () => {
-      set({ isConnected: false });
+      if (!get().isStandaloneMode) {
+        set({ isConnected: false });
+      }
     });
 
     socket.on('auction:init', (data: AuctionState) => {
@@ -100,6 +178,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         state: data,
         secondsLeft: data.auction?.secondsLeft ?? 10,
         isConnected: true,
+        isStandaloneMode: false,
       });
     });
 
@@ -173,7 +252,6 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
       sound.playGavelSound();
 
-      // Launch Confetti
       try {
         confetti({
           particleCount: 80,
@@ -225,14 +303,264 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
   },
 
   placeBid: async (amount?: number, teamId?: string) => {
+    const { isStandaloneMode, state } = get();
+
+    if (!isStandaloneMode) {
+      set({ isBidding: true });
+      try {
+        await api.placeBid(amount, teamId);
+      } catch (err: any) {
+        get().showToast(err.message, 'error');
+        throw err;
+      } finally {
+        set({ isBidding: false });
+      }
+      return;
+    }
+
+    // Standalone Simulation Bid Handler
+    if (!state || !state.activePlayer) return;
     set({ isBidding: true });
+
     try {
-      await api.placeBid(amount, teamId);
+      const activeP = state.activePlayer;
+      const effectiveTeam = state.teams.find((t) => t.id === teamId) || state.teams[0];
+      const targetAmount = amount || (state.currentBid + getMinBidIncrement(state.currentBid));
+
+      if (effectiveTeam.remainingPurse < targetAmount) {
+        throw new Error('Insufficient purse for this bid.');
+      }
+
+      const newBid: Bid = {
+        id: `bid-${Date.now()}`,
+        auctionId: state.auction.id,
+        playerId: activeP.id,
+        player: activeP,
+        teamId: effectiveTeam.id,
+        team: effectiveTeam,
+        amount: targetAmount,
+        bidNumber: state.recentBids.length + 1,
+        createdAt: new Date().toISOString(),
+      };
+
+      const nextState: AuctionState = {
+        ...state,
+        currentBid: targetAmount,
+        highestBidTeam: effectiveTeam,
+        auction: {
+          ...state.auction,
+          activePlayerPrice: targetAmount,
+          highestBidTeamId: effectiveTeam.id,
+        },
+        recentBids: [newBid, ...state.recentBids],
+        minIncrement: getMinBidIncrement(targetAmount),
+      };
+
+      set({
+        state: nextState,
+        secondsLeft: 10,
+        isTimerWarning: false,
+        isTimerUrgent: false,
+        lastBidFlash: true,
+      });
+
+      sound.playBidChime();
+      get().showToast(`${effectiveTeam.name} bids ₹${(targetAmount / 10000000).toFixed(2)} Cr!`, 'info');
+
+      setTimeout(() => set({ lastBidFlash: false }), 600);
+      get().startStandaloneTimer();
+
+      // Trigger automatic AI rival franchise bid after 3 seconds if under budget
+      setTimeout(() => {
+        const cur = get().state;
+        if (!cur || cur.auction.status !== 'ACTIVE' || !cur.highestBidTeam) return;
+        if (cur.highestBidTeam.id === effectiveTeam.id && targetAmount < 140000000) {
+          // Rival team (pick another team)
+          const rivalTeam = cur.teams.find((t) => t.id !== effectiveTeam.id && t.remainingPurse > targetAmount + 2000000);
+          if (rivalTeam) {
+            const rivalBidAmount = targetAmount + getMinBidIncrement(targetAmount);
+            const rivalBid: Bid = {
+              id: `bid-${Date.now()}`,
+              auctionId: cur.auction.id,
+              playerId: activeP.id,
+              player: activeP,
+              teamId: rivalTeam.id,
+              team: rivalTeam,
+              amount: rivalBidAmount,
+              bidNumber: cur.recentBids.length + 1,
+              createdAt: new Date().toISOString(),
+            };
+
+            set({
+              state: {
+                ...cur,
+                currentBid: rivalBidAmount,
+                highestBidTeam: rivalTeam,
+                auction: {
+                  ...cur.auction,
+                  activePlayerPrice: rivalBidAmount,
+                  highestBidTeamId: rivalTeam.id,
+                },
+                recentBids: [rivalBid, ...cur.recentBids],
+                minIncrement: getMinBidIncrement(rivalBidAmount),
+              },
+              secondsLeft: 10,
+              lastBidFlash: true,
+            });
+
+            sound.playBidChime();
+            get().showToast(`Counter-bid! ${rivalTeam.name} bids ₹${(rivalBidAmount / 10000000).toFixed(2)} Cr!`, 'info');
+            setTimeout(() => set({ lastBidFlash: false }), 600);
+            get().startStandaloneTimer();
+          }
+        }
+      }, 3200);
     } catch (err: any) {
       get().showToast(err.message, 'error');
       throw err;
     } finally {
       set({ isBidding: false });
+    }
+  },
+
+  adminActionStandalone: async (action: string, payload?: any) => {
+    const { state } = get();
+    if (!state) return;
+
+    if (action === 'pause') {
+      get().stopStandaloneTimer();
+      set({ state: { ...state, auction: { ...state.auction, status: 'PAUSED' } } });
+      get().showToast('Auction paused', 'info');
+    } else if (action === 'resume' || action === 'start') {
+      set({ state: { ...state, auction: { ...state.auction, status: 'ACTIVE' } } });
+      get().startStandaloneTimer();
+      get().showToast('Auction started/resumed', 'success');
+    } else if (action === 'sell') {
+      get().stopStandaloneTimer();
+      if (!state.activePlayer || !state.highestBidTeam) {
+        get().adminActionStandalone('unsold');
+        return;
+      }
+      const winningTeam = state.highestBidTeam;
+      const player = state.activePlayer;
+      const finalPrice = state.currentBid;
+
+      // Deduct purse and add player to squad
+      const updatedTeams = state.teams.map((t) => {
+        if (t.id === winningTeam.id) {
+          const newPurse = t.remainingPurse - finalPrice;
+          return {
+            ...t,
+            remainingPurse: newPurse,
+            squadSize: (t.squadSize || 0) + 1,
+            overseasCount: player.isOverseas ? (t.overseasCount || 0) + 1 : t.overseasCount,
+            squad: [
+              ...(t.squad || []),
+              { id: `sp-${Date.now()}`, price: finalPrice, player: { ...player, status: 'SOLD' as any } },
+            ],
+          };
+        }
+        return t;
+      });
+
+      set({
+        state: { ...state, teams: updatedTeams },
+        soldOverlay: {
+          player,
+          winningTeam,
+          finalPrice,
+          formattedPrice: `₹${(finalPrice / 10000000).toFixed(2)} Cr`,
+        },
+      });
+
+      sound.playGavelSound();
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#f59e0b', '#10b981', '#3b82f6', '#ffffff'],
+        });
+      } catch (e) {}
+
+      setTimeout(() => {
+        get().adminActionStandalone('next');
+      }, 4000);
+    } else if (action === 'unsold') {
+      get().stopStandaloneTimer();
+      if (!state.activePlayer) return;
+      const player = state.activePlayer;
+
+      set({
+        unsoldOverlay: {
+          player,
+          basePrice: player.basePrice,
+          formattedBasePrice: `₹${(player.basePrice / 10000000).toFixed(2)} Cr`,
+        },
+      });
+
+      sound.playUnsoldBuzzer();
+
+      setTimeout(() => {
+        get().adminActionStandalone('next');
+      }, 3500);
+    } else if (action === 'next') {
+      get().stopStandaloneTimer();
+      set({ soldOverlay: null, unsoldOverlay: null });
+
+      // Find next player
+      const currentIndex = INITIAL_PLAYERS.findIndex((p) => p.id === state.activePlayer?.id);
+      const nextP = INITIAL_PLAYERS[currentIndex + 1] || INITIAL_PLAYERS[0];
+
+      set({
+        state: {
+          ...state,
+          activePlayer: nextP,
+          currentBid: nextP.basePrice,
+          highestBidTeam: null,
+          recentBids: [],
+          minIncrement: getMinBidIncrement(nextP.basePrice),
+          auction: {
+            ...state.auction,
+            activePlayerId: nextP.id,
+            activePlayerPrice: nextP.basePrice,
+            highestBidTeamId: null,
+            status: 'ACTIVE',
+          },
+        },
+        secondsLeft: 10,
+        isTimerWarning: false,
+        isTimerUrgent: false,
+      });
+
+      get().showToast(`Up Next: ${nextP.name}`, 'info');
+      get().startStandaloneTimer();
+    } else if (action === 'reset') {
+      get().stopStandaloneTimer();
+      const firstP = INITIAL_PLAYERS[0];
+      set({
+        state: {
+          ...state,
+          teams: INITIAL_TEAMS,
+          activePlayer: firstP,
+          currentBid: firstP.basePrice,
+          highestBidTeam: null,
+          recentBids: [],
+          minIncrement: getMinBidIncrement(firstP.basePrice),
+          auction: {
+            ...state.auction,
+            activePlayerId: firstP.id,
+            activePlayerPrice: firstP.basePrice,
+            highestBidTeamId: null,
+            status: 'ACTIVE',
+          },
+        },
+        secondsLeft: 10,
+        soldOverlay: null,
+        unsoldOverlay: null,
+      });
+      get().showToast('Auction reset to pristine state', 'info');
+      get().startStandaloneTimer();
     }
   },
 }));
