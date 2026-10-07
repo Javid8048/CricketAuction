@@ -1,6 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-
-const SOCKET_URL = 'http://localhost:5000';
+import { getBackendUrl } from './api';
 
 class SocketService {
   public socket: Socket | null = null;
@@ -12,7 +11,7 @@ class SocketService {
     }
 
     if (!this.socket) {
-      this.socket = io(SOCKET_URL, {
+      this.socket = io(getBackendUrl(), {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: Infinity,

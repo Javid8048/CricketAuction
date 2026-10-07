@@ -1,4 +1,18 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+export function getBackendUrl(): string {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('caa_backend_url');
+    if (saved) return saved.trim().replace(/\/+$/, '');
+  }
+  const env = (import.meta as any).env;
+  if (env && env.VITE_API_URL) {
+    return (env.VITE_API_URL as string).trim().replace(/\/+$/, '');
+  }
+  return 'http://localhost:5000';
+}
+
+export function getApiBaseUrl(): string {
+  return `${getBackendUrl()}/api`;
+}
 
 class ApiService {
   private getHeaders(): HeadersInit {
@@ -25,7 +39,7 @@ class ApiService {
 
   // Auth
   async login(email: string, password: string) {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const res = await fetch(`${getApiBaseUrl()}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -34,7 +48,7 @@ class ApiService {
   }
 
   async getCurrentUser() {
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+    const res = await fetch(`${getApiBaseUrl()}/auth/me`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<{ user: any }>(res);
@@ -43,21 +57,21 @@ class ApiService {
   // Players
   async getPlayers(params?: Record<string, string>) {
     const query = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_BASE_URL}/players${query ? `?${query}` : ''}`, {
+    const res = await fetch(`${getApiBaseUrl()}/players${query ? `?${query}` : ''}`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any[]>(res);
   }
 
   async getPlayerById(id: string) {
-    const res = await fetch(`${API_BASE_URL}/players/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/players/${id}`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);
   }
 
   async createPlayer(data: any) {
-    const res = await fetch(`${API_BASE_URL}/players`, {
+    const res = await fetch(`${getApiBaseUrl()}/players`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -66,7 +80,7 @@ class ApiService {
   }
 
   async updatePlayer(id: string, data: any) {
-    const res = await fetch(`${API_BASE_URL}/players/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/players/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -75,7 +89,7 @@ class ApiService {
   }
 
   async deletePlayer(id: string) {
-    const res = await fetch(`${API_BASE_URL}/players/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/players/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
@@ -84,21 +98,21 @@ class ApiService {
 
   // Teams
   async getTeams() {
-    const res = await fetch(`${API_BASE_URL}/teams`, {
+    const res = await fetch(`${getApiBaseUrl()}/teams`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any[]>(res);
   }
 
   async getTeamById(id: string) {
-    const res = await fetch(`${API_BASE_URL}/teams/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${id}`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);
   }
 
   async updateTeam(id: string, data: any) {
-    const res = await fetch(`${API_BASE_URL}/teams/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -108,14 +122,14 @@ class ApiService {
 
   // Auction
   async getCurrentAuction() {
-    const res = await fetch(`${API_BASE_URL}/auction/current`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/current`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);
   }
 
   async placeBid(amount?: number, teamId?: string) {
-    const res = await fetch(`${API_BASE_URL}/auction/bid`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/bid`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ amount, teamId }),
@@ -124,7 +138,7 @@ class ApiService {
   }
 
   async startAuction() {
-    const res = await fetch(`${API_BASE_URL}/auction/start`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/start`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -132,7 +146,7 @@ class ApiService {
   }
 
   async pauseAuction() {
-    const res = await fetch(`${API_BASE_URL}/auction/pause`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/pause`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -140,7 +154,7 @@ class ApiService {
   }
 
   async resumeAuction() {
-    const res = await fetch(`${API_BASE_URL}/auction/resume`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/resume`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -148,7 +162,7 @@ class ApiService {
   }
 
   async selectPlayer(playerId: string) {
-    const res = await fetch(`${API_BASE_URL}/auction/select`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/select`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ playerId }),
@@ -157,7 +171,7 @@ class ApiService {
   }
 
   async startBidding() {
-    const res = await fetch(`${API_BASE_URL}/auction/start-bidding`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/start-bidding`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -165,7 +179,7 @@ class ApiService {
   }
 
   async nextPlayer() {
-    const res = await fetch(`${API_BASE_URL}/auction/next`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/next`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -173,7 +187,7 @@ class ApiService {
   }
 
   async sellPlayer() {
-    const res = await fetch(`${API_BASE_URL}/auction/sell`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/sell`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -181,7 +195,7 @@ class ApiService {
   }
 
   async markUnsold() {
-    const res = await fetch(`${API_BASE_URL}/auction/unsold`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/unsold`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -189,7 +203,7 @@ class ApiService {
   }
 
   async skipPlayer() {
-    const res = await fetch(`${API_BASE_URL}/auction/skip`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/skip`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -197,7 +211,7 @@ class ApiService {
   }
 
   async reauctionUnsold() {
-    const res = await fetch(`${API_BASE_URL}/auction/reauction`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/reauction`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -205,7 +219,7 @@ class ApiService {
   }
 
   async resetAuction() {
-    const res = await fetch(`${API_BASE_URL}/auction/reset`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/reset`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -218,21 +232,21 @@ class ApiService {
     if (playerId) params.append('playerId', playerId);
     const query = params.toString();
 
-    const res = await fetch(`${API_BASE_URL}/auction/history${query ? `?${query}` : ''}`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/history${query ? `?${query}` : ''}`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);
   }
 
   async getAuctionResults() {
-    const res = await fetch(`${API_BASE_URL}/auction/results`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/results`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);
   }
 
   async getDashboardStats() {
-    const res = await fetch(`${API_BASE_URL}/auction/stats`, {
+    const res = await fetch(`${getApiBaseUrl()}/auction/stats`, {
       headers: this.getHeaders(),
     });
     return this.handleResponse<any>(res);

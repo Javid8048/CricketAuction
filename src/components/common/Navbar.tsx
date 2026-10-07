@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Shield, Users, Radio, UserCheck, ChevronDown, Trophy, LogOut, Flame } from 'lucide-react';
+import { Volume2, VolumeX, Shield, Users, Radio, UserCheck, ChevronDown, Trophy, LogOut, Flame, Server } from 'lucide-react';
 import { useAuthStore } from '../../store/auth.store';
 import { useAuctionStore } from '../../store/auction.store';
 import { formatRupees } from '../../utils/currency';
+import { getBackendUrl } from '../../services/api';
 
 interface NavbarProps {
   currentTab: string;
@@ -14,6 +15,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
   const { user, logout, quickLogin } = useAuthStore();
   const { state, isConnected, soundMuted, toggleSound } = useAuctionStore();
   const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(getBackendUrl());
 
   const auctionStatus = state?.auction?.status || 'IDLE';
 
@@ -155,6 +158,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
 
         {/* Right Side: Demo Account Switcher, Sound, User Info */}
         <div className="flex items-center gap-3">
+          {/* Server / Backend Config */}
+          <button
+            onClick={() => setShowServerModal(true)}
+            title="Backend Server Settings"
+            className="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 hover:bg-slate-700/80 transition-colors border border-slate-700/60"
+          >
+            <Server className="w-4 h-4 text-amber-400" />
+          </button>
+
           {/* Sound Toggle */}
           <button
             onClick={toggleSound}
@@ -259,6 +271,87 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
           )}
         </div>
       </div>
+
+      {/* Backend Server Settings Modal */}
+      {showServerModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Server className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Live Backend Connection</h3>
+                <p className="text-xs text-slate-400">Configure WebSocket & REST API endpoint</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
+              GitHub Pages hosts the frontend client. To sync bids live across multiple devices/tabs in real-time, connect your deployed backend URL (Render, Railway, Codespaces, or localhost).
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Backend API & WebSocket URL
+                </label>
+                <input
+                  type="text"
+                  value={serverUrlInput}
+                  onChange={(e) => setServerUrlInput(e.target.value)}
+                  placeholder="e.g. https://cricket-auction-backend.onrender.com"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <div className="font-semibold text-slate-300">Quick options:</div>
+                <div>• <code className="text-amber-400">Render Free Cloud</code>: Connect your Render web service URL</div>
+                <div>• <code className="text-cyan-400">http://localhost:5000</code>: Local development server</div>
+                <div>• <code className="text-emerald-400">Standalone Mode</code>: Runs 100% in browser with smart simulation</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('caa_backend_url');
+                  window.location.reload();
+                }}
+                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
+              >
+                Reset to Default
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowServerModal(false)}
+                  className="px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (serverUrlInput.trim()) {
+                      localStorage.setItem('caa_backend_url', serverUrlInput.trim());
+                    } else {
+                      localStorage.removeItem('caa_backend_url');
+                    }
+                    setShowServerModal(false);
+                    window.location.reload();
+                  }}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all"
+                >
+                  Save & Connect
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
