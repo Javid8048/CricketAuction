@@ -4,16 +4,19 @@ export function getBackendUrl(): string {
     const saved = localStorage.getItem('caa_backend_url');
     if (saved) return saved.trim().replace(/\/+$/, '');
 
-    // 2. Auto-detect localhost vs remote (GitHub Pages)
+    // 2. Auto-detect local network IP or localhost vs remote (GitHub Pages)
     const hostname = window.location.hostname;
-    const isLocalhost =
+    const isLocal =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname === '::1' ||
-      hostname.endsWith('.local');
+      hostname.endsWith('.local') ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
 
-    if (isLocalhost) {
-      return 'http://localhost:5000';
+    if (isLocal) {
+      return `http://${hostname}:5000`;
     }
   }
 
