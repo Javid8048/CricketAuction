@@ -44,7 +44,7 @@ class SocketService {
   }
 
   public emitBid(amount?: number) {
-    const token = localStorage.getItem('caa_token');
+    const token = sessionStorage.getItem('caa_token');
     if (this.socket) {
       this.socket.emit('bid:place', { token, amount });
     }

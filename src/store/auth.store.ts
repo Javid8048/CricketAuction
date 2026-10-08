@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, Team } from '../types';
+import { User } from '../types';
 import { api } from '../services/api';
 
 interface AuthState {
@@ -14,10 +14,35 @@ interface AuthState {
   quickLogin: (email: string) => Promise<void>;
 }
 
+// Ensure clean migration from old localStorage if any residue exists
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('caa_token');
+    localStorage.removeItem('caa_user');
+  } catch (e) {
+    // ignore
+  }
+}
+
+const getInitialUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('caa_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getInitialToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('caa_token');
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: localStorage.getItem('caa_token'),
-  isAuthenticated: !!localStorage.getItem('caa_token'),
+  user: getInitialUser(),
+  token: getInitialToken(),
+  isAuthenticated: !!getInitialToken(),
   isLoading: false,
   error: null,
 
@@ -25,7 +50,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await api.login(email, pass);
-      localStorage.setItem('caa_token', data.token);
+      sessionStorage.setItem('caa_token', data.token);
+      sessionStorage.setItem('caa_user', JSON.stringify(data.user));
       set({
         user: data.user,
         token: data.token,
@@ -43,7 +69,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const pass = email.includes('admin') ? 'admin123' : 'team123';
       const data = await api.login(email, pass);
-      localStorage.setItem('caa_token', data.token);
+      sessionStorage.setItem('caa_token', data.token);
+      sessionStorage.setItem('caa_user', JSON.stringify(data.user));
       set({
         user: data.user,
         token: data.token,
@@ -57,7 +84,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('caa_token');
+    sessionStorage.removeItem('caa_token');
+    sessionStorage.removeItem('caa_user');
     set({
       user: null,
       token: null,
@@ -66,16 +94,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
-    const token = localStorage.getItem('caa_token');
+    const token = sessionStorage.getItem('caa_token');
     if (!token) {
-      set({ isAuthenticated: false, user: null });
+      set({ isAuthenticated: false, user: null, token: null });
       return;
     }
     try {
       const data = await api.getCurrentUser();
-      set({ user: data.user, isAuthenticated: true });
+      sessionStorage.setItem('caa_user', JSON.stringify(data.user));
+      set({ user: data.user, isAuthenticated: true, token });
     } catch (err) {
-      localStorage.removeItem('caa_token');
+      sessionStorage.removeItem('caa_token');
+      sessionStorage.removeItem('caa_user');
       set({ user: null, token: null, isAuthenticated: false });
     }
   },

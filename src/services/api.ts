@@ -1,7 +1,7 @@
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined') {
     // 1. User manual override from UI settings modal
-    const saved = localStorage.getItem('caa_backend_url');
+    const saved = sessionStorage.getItem('caa_backend_url') || localStorage.getItem('caa_backend_url');
     if (saved) return saved.trim().replace(/\/+$/, '');
 
     // 2. Auto-detect local network IP or localhost vs remote (GitHub Pages)
@@ -36,7 +36,7 @@ export function getApiBaseUrl(): string {
 
 class ApiService {
   private getHeaders(): HeadersInit {
-    const token = localStorage.getItem('caa_token');
+    const token = sessionStorage.getItem('caa_token');
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

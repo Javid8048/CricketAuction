@@ -316,6 +316,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
               <button
                 type="button"
                 onClick={() => {
+                  sessionStorage.removeItem('caa_backend_url');
                   localStorage.removeItem('caa_backend_url');
                   window.location.reload();
                 }}
@@ -336,8 +337,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                   type="button"
                   onClick={() => {
                     if (serverUrlInput.trim()) {
+                      sessionStorage.setItem('caa_backend_url', serverUrlInput.trim());
                       localStorage.setItem('caa_backend_url', serverUrlInput.trim());
                     } else {
+                      sessionStorage.removeItem('caa_backend_url');
                       localStorage.removeItem('caa_backend_url');
                     }
                     setShowServerModal(false);
