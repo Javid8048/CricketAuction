@@ -1,12 +1,29 @@
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined') {
+    // 1. User manual override from UI settings modal
     const saved = localStorage.getItem('caa_backend_url');
     if (saved) return saved.trim().replace(/\/+$/, '');
+
+    // 2. Auto-detect localhost vs remote (GitHub Pages)
+    const hostname = window.location.hostname;
+    const isLocalhost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname.endsWith('.local');
+
+    if (isLocalhost) {
+      return 'http://localhost:5000';
+    }
   }
+
+  // 3. Vite environment variable override
   const env = (import.meta as any).env;
   if (env && env.VITE_API_URL) {
     return (env.VITE_API_URL as string).trim().replace(/\/+$/, '');
   }
+
+  // 4. Production remote default (Render)
   return 'https://cricketauctionbackend-ypoh.onrender.com';
 }
 
