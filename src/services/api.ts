@@ -7,7 +7,7 @@ export function getBackendUrl(): string {
   if (env && env.VITE_API_URL) {
     return (env.VITE_API_URL as string).trim().replace(/\/+$/, '');
   }
-  return 'http://localhost:5000';
+  return 'https://cricketauctionbackend-ypoh.onrender.com';
 }
 
 export function getApiBaseUrl(): string {
