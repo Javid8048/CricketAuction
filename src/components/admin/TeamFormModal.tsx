@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, X, Phone, MapPin, User, Coins, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, X, Phone, MapPin, User, Coins, Users, Key, Lock, Eye, EyeOff } from 'lucide-react';
 import { Team } from '../../types';
 import { api } from '../../services/api';
 import { useAuctionStore } from '../../store/auction.store';
@@ -15,31 +15,125 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
   const { showToast, initState } = useAuctionStore();
 
   const [formData, setFormData] = useState({
-    name: teamToEdit?.name || '',
-    shortName: teamToEdit?.shortName || '',
-    ownerName: teamToEdit?.ownerName || '',
-    phone: teamToEdit?.phone || '',
-    address: teamToEdit?.address || '',
-    primaryColor: teamToEdit?.primaryColor || '#3B82F6',
-    secondaryColor: teamToEdit?.secondaryColor || '#1E40AF',
-    totalPurse: teamToEdit?.totalPurse !== undefined ? teamToEdit.totalPurse : 15000,
-    maxSquadSize: teamToEdit?.maxSquadSize !== undefined ? teamToEdit.maxSquadSize : 12,
+    name: '',
+    shortName: '',
+    ownerName: '',
+    phone: '',
+    address: '',
+    loginUsername: '',
+    loginPassword: '',
+    primaryColor: '#3B82F6',
+    secondaryColor: '#1E40AF',
+    totalPurse: 15000,
+    maxSquadSize: 12,
   });
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (teamToEdit) {
+      setFormData({
+        name: teamToEdit.name || '',
+        shortName: teamToEdit.shortName || '',
+        ownerName: teamToEdit.ownerName || '',
+        phone: teamToEdit.phone || '',
+        address: teamToEdit.address || '',
+        loginUsername: teamToEdit.loginUsername || '',
+        loginPassword: teamToEdit.loginPassword || '',
+        primaryColor: teamToEdit.primaryColor || '#3B82F6',
+        secondaryColor: teamToEdit.secondaryColor || '#1E40AF',
+        totalPurse: teamToEdit.totalPurse !== undefined ? teamToEdit.totalPurse : 15000,
+        maxSquadSize: teamToEdit.maxSquadSize !== undefined ? teamToEdit.maxSquadSize : 12,
+      });
+    } else {
+      setFormData({
+        name: '',
+        shortName: '',
+        ownerName: '',
+        phone: '',
+        address: '',
+        loginUsername: '',
+        loginPassword: '',
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E40AF',
+        totalPurse: 15000,
+        maxSquadSize: 12,
+      });
+    }
+    setTouched({});
+    setApiError(null);
+  }, [teamToEdit, isOpen]);
 
   if (!isOpen) return null;
 
+  // Real-time validation
+  const errors: Record<string, string> = {};
+  if (!formData.name.trim()) {
+    errors.name = 'Team Name is required';
+  } else if (formData.name.trim().length < 2) {
+    errors.name = 'Name must be at least 2 characters';
+  }
+
+  if (formData.shortName.trim() && formData.shortName.trim().length > 5) {
+    errors.shortName = 'Short name should be max 5 characters';
+  }
+
+  if (formData.loginUsername.trim() && formData.loginUsername.trim().length < 3) {
+    errors.loginUsername = 'Username must be at least 3 characters';
+  }
+
+  if (formData.loginPassword.trim() && formData.loginPassword.trim().length < 4) {
+    errors.loginPassword = 'Password must be at least 4 characters';
+  }
+
+  if (formData.totalPurse < 1000) {
+    errors.totalPurse = 'Purse must be at least ₹1,000';
+  }
+
+  if (formData.maxSquadSize < 5 || formData.maxSquadSize > 30) {
+    errors.maxSquadSize = 'Squad size must be between 5 and 30';
+  }
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleNameChange = (nameVal: string) => {
+    const updated: any = { name: nameVal };
+    // Auto-generate shortName and username if empty
+    if (!formData.shortName && !teamToEdit) {
+      const words = nameVal.trim().split(/\s+/);
+      if (words.length > 1) {
+        updated.shortName = words.map((w) => w[0]).join('').slice(0, 4).toUpperCase();
+      } else if (nameVal.length >= 3) {
+        updated.shortName = nameVal.slice(0, 3).toUpperCase();
+      }
+    }
+    if (!formData.loginUsername && !teamToEdit) {
+      updated.loginUsername = nameVal.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    setFormData((prev) => ({ ...prev, ...updated }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setError('Team Name is required.');
+    setTouched({
+      name: true,
+      loginUsername: true,
+      loginPassword: true,
+      totalPurse: true,
+      maxSquadSize: true,
+    });
+
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setApiError(null);
 
     try {
       if (teamToEdit) {
@@ -52,7 +146,7 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
       await initState();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to save team details.');
+      setApiError(err.message || 'Failed to save team details.');
     } finally {
       setIsSubmitting(false);
     }
@@ -70,7 +164,7 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
               <h3 className="text-base font-bold text-white">
                 {teamToEdit ? `Edit Team: ${teamToEdit.name}` : 'Add New Franchise / Team'}
               </h3>
-              <p className="text-xs text-slate-400">Configure team profile, owner details, purse, and squad limits</p>
+              <p className="text-xs text-slate-400">Configure team profile, login credentials, purse, and limits</p>
             </div>
           </div>
           <button
@@ -81,9 +175,9 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
           </button>
         </div>
 
-        {error && (
+        {apiError && (
           <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-            {error}
+            {apiError}
           </div>
         )}
 
@@ -98,10 +192,18 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => handleNameChange(e.target.value)}
+                onBlur={() => handleBlur('name')}
                 placeholder="e.g. Coastal Kings"
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                className={`w-full px-3 py-2 bg-slate-950 border rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none transition-colors ${
+                  touched.name && errors.name
+                    ? 'border-rose-500 focus:border-rose-400 bg-rose-950/10'
+                    : 'border-slate-800 focus:border-amber-500'
+                }`}
               />
+              {touched.name && errors.name && (
+                <p className="text-[11px] text-rose-400 mt-1">{errors.name}</p>
+              )}
             </div>
 
             <div>
@@ -110,12 +212,16 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
               </label>
               <input
                 type="text"
-                maxLength={4}
+                maxLength={5}
                 value={formData.shortName}
                 onChange={(e) => setFormData({ ...formData, shortName: e.target.value.toUpperCase() })}
+                onBlur={() => handleBlur('shortName')}
                 placeholder="e.g. CK"
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white uppercase font-mono font-bold focus:outline-none focus:border-amber-500"
               />
+              {touched.shortName && errors.shortName && (
+                <p className="text-[11px] text-rose-400 mt-1">{errors.shortName}</p>
+              )}
             </div>
           </div>
 
@@ -171,6 +277,75 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
             </div>
           </div>
 
+          {/* Franchise Login Credentials Box */}
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-2.5">
+            <div className="flex items-center gap-2 pb-1.5 border-b border-slate-800">
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">Franchise Login Portal Access</span>
+              <span className="text-[10px] text-slate-500 ml-auto">(Admin Viewable & Editable)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Login UserName
+                </label>
+                <div className="relative">
+                  <User className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={formData.loginUsername}
+                    onChange={(e) => setFormData({ ...formData, loginUsername: e.target.value })}
+                    onBlur={() => handleBlur('loginUsername')}
+                    placeholder="e.g. csk_admin"
+                    className={`w-full pl-8 pr-3 py-1.5 bg-slate-900 border rounded-lg text-xs text-cyan-300 font-mono placeholder-slate-600 focus:outline-none ${
+                      touched.loginUsername && errors.loginUsername
+                        ? 'border-rose-500'
+                        : 'border-slate-700 focus:border-amber-500'
+                    }`}
+                  />
+                </div>
+                {touched.loginUsername && errors.loginUsername && (
+                  <p className="text-[10px] text-rose-400 mt-0.5">{errors.loginUsername}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Login Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.loginPassword}
+                    onChange={(e) => setFormData({ ...formData, loginPassword: e.target.value })}
+                    onBlur={() => handleBlur('loginPassword')}
+                    placeholder="e.g. Pass@123"
+                    className={`w-full pl-8 pr-8 py-1.5 bg-slate-900 border rounded-lg text-xs text-amber-300 font-mono placeholder-slate-600 focus:outline-none ${
+                      touched.loginPassword && errors.loginPassword
+                        ? 'border-rose-500'
+                        : 'border-slate-700 focus:border-amber-500'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {touched.loginPassword && errors.loginPassword && (
+                  <p className="text-[10px] text-rose-400 mt-0.5">{errors.loginPassword}</p>
+                )}
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              Set the login username & password for the franchise owner. These will appear in the Admin Credentials table.
+            </p>
+          </div>
+
           {/* Purse & Squad Limit */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
             <div>
@@ -196,7 +371,7 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
               <input
                 type="number"
                 min="5"
-                max="25"
+                max="30"
                 required
                 value={formData.maxSquadSize}
                 onChange={(e) => setFormData({ ...formData, maxSquadSize: Number(e.target.value) })}
@@ -249,7 +424,7 @@ export const TeamFormModal: React.FC<TeamFormModalProps> = ({ isOpen, onClose, t
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}

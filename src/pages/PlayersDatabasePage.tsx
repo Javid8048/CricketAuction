@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Plus, Globe, Award, Info, Trash2, Edit, Star, MapPin } from 'lucide-react';
+import { Search, Filter, Plus, Globe, Award, Info, Trash2, Edit, Star, MapPin, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { Player } from '../types';
 import { formatRupees } from '../utils/currency';
@@ -174,8 +174,35 @@ export const PlayersDatabasePage: React.FC = () => {
       {/* Players Catalog Grid */}
       {loading ? (
         <div className="py-16 text-center text-slate-400">Loading players catalog...</div>
+      ) : players.length === 0 ? (
+        <div className="bg-[#121724] border border-slate-800 rounded-3xl p-12 text-center max-w-xl mx-auto shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400">
+            <Users className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-2">No Cricketers Registered Yet</h3>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            Players can register themselves directly using the public registration link, or the Commissioner can add players manually.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href="#register"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all"
+            >
+              Open Public Player Form
+            </a>
+            {isAdmin && (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                Add Player Manually
+              </button>
+            )}
+          </div>
+        </div>
       ) : filteredPlayers.length === 0 ? (
-        <div className="py-16 text-center text-slate-500 italic">No players matched your filter criteria.</div>
+        <div className="py-16 text-center text-slate-500 italic">No players matched your search or filter criteria.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredPlayers.map((p) => (

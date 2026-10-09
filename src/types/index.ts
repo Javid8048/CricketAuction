@@ -53,6 +53,8 @@ export interface Team {
   ownerName?: string | null;
   phone?: string | null;
   address?: string | null;
+  loginUsername?: string | null;
+  loginPassword?: string | null;
   primaryColor: string;
   secondaryColor: string;
   logoText: string;
@@ -142,6 +144,7 @@ export interface AuctionState {
   secondsLeft?: number;
   recentBids: Bid[];
   teams: Team[];
+  players?: Player[];
   minIncrement?: number;
 }
 

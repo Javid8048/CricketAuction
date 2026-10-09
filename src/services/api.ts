@@ -356,6 +356,32 @@ class ApiService {
     });
     return this.handleResponse<any>(res);
   }
+
+  // Franchise Credentials (Admin only)
+  async getFranchiseCredentials() {
+    const res = await fetch(`${getApiBaseUrl()}/teams/admin/credentials`, {
+      headers: this.getHeaders(),
+    });
+    return this.handleResponse<any[]>(res);
+  }
+
+  async updateFranchiseCredentials(teamId: string, data: { loginUsername?: string; loginPassword?: string }) {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${teamId}/credentials`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Reset / Clear All Tournament Data
+  async clearAllTournamentData() {
+    const res = await fetch(`${getApiBaseUrl()}/auction/clear-all`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+    return this.handleResponse<any>(res);
+  }
 }
 
 export const api = new ApiService();

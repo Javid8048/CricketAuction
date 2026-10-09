@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/auth.store';
-import { Flame, Shield, Users, Lock, User, ArrowRight, KeyRound, UserPlus } from 'lucide-react';
+import { Flame, Shield, Lock, User, ArrowRight, KeyRound, UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 
 interface LoginPageProps {
@@ -9,9 +9,11 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister }) => {
-  const { login, quickLogin, isLoading, error } = useAuthStore();
+  const { login, isLoading, error } = useAuthStore();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Password reset modal inside login
   const [showResetModal, setShowResetModal] = useState(false);
@@ -21,17 +23,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
   const [resetStatus, setResetStatus] = useState<{ text: string; error?: boolean } | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await login(usernameOrEmail.trim(), password);
-      onSuccess();
-    } catch (err) {}
+  // Field validation
+  const errors: Record<string, string> = {};
+  if (!usernameOrEmail.trim()) {
+    errors.username = 'Username or email is required';
+  }
+  if (!password) {
+    errors.password = 'Password is required';
+  }
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleQuickDemo = async (demoIdentifier: string) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched({ username: true, password: true });
+
+    if (Object.keys(errors).length > 0) return;
+
     try {
-      await quickLogin(demoIdentifier);
+      await login(usernameOrEmail.trim(), password);
       onSuccess();
     } catch (err) {}
   };
@@ -39,6 +51,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
   const handleAdminFill = () => {
     setUsernameOrEmail('KhaderMeeran');
     setPassword('Admin@123');
+    setTouched({ username: true, password: true });
   };
 
   const handleResetSubmit = async (e: React.FormEvent) => {
@@ -56,7 +69,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
     setResetStatus(null);
     try {
       await api.resetPassword(newPass, currentPass);
-      setResetStatus({ text: 'Admin password updated successfully! Please sign in with your new password.', error: false });
+      setResetStatus({
+        text: 'Admin password updated successfully! Please sign in with your new password.',
+        error: false,
+      });
       setTimeout(() => {
         setShowResetModal(false);
         setPassword(newPass);
@@ -69,25 +85,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-[#121724] border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
+    <div className="min-h-[85vh] flex items-center justify-center px-3 sm:px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md bg-[#121724] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
         {/* Glowing aura */}
         <div className="absolute -top-20 -right-20 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Brand header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-amber-500/25">
             <Flame className="w-7 h-7 text-slate-950 fill-slate-950" />
           </div>
-          <h1 className="text-2xl font-black text-white font-display">SIGN IN TO ARENA</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-white font-display">OFFICIAL SIGN IN</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Access tournament commissioner desk or franchise team desk.
+            Tournament Commissioner Desk & Franchise Portals
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs text-center font-medium">
-            {error}
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -104,10 +121,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
                 required
                 value={usernameOrEmail}
                 onChange={(e) => setUsernameOrEmail(e.target.value)}
-                placeholder="KhaderMeeran or team1@demo.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                onBlur={() => handleBlur('username')}
+                placeholder="e.g. KhaderMeeran or csk_admin"
+                className={`w-full bg-slate-900 border rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors ${
+                  touched.username && errors.username
+                    ? 'border-rose-500 focus:border-rose-400 bg-rose-950/10'
+                    : 'border-slate-700 focus:border-amber-500'
+                }`}
               />
             </div>
+            {touched.username && errors.username && (
+              <p className="text-[11px] text-rose-400 mt-1">{errors.username}</p>
+            )}
           </div>
 
           <div>
@@ -126,14 +151,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => handleBlur('password')}
                 placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                className={`w-full bg-slate-900 border rounded-xl pl-9 pr-9 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors ${
+                  touched.password && errors.password
+                    ? 'border-rose-500 focus:border-rose-400 bg-rose-950/10'
+                    : 'border-slate-700 focus:border-amber-500'
+                }`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+            {touched.password && errors.password && (
+              <p className="text-[11px] text-rose-400 mt-1">{errors.password}</p>
+            )}
           </div>
 
           <button
@@ -148,74 +188,42 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onOpenRegister 
 
         {/* Public Player Registration Link */}
         {onOpenRegister && (
-          <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between">
+          <div className="mt-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row items-center justify-between gap-2.5">
             <div className="flex items-center gap-2 text-xs text-emerald-300">
               <UserPlus className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Are you a Cricketer wanting to enter the draft?</span>
+              <span>Are you a Cricketer entering the draft?</span>
             </div>
             <button
               type="button"
               onClick={onOpenRegister}
-              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0"
+              className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 shadow-sm"
             >
-              Register Here
+              Register as Player
             </button>
           </div>
         )}
 
-        {/* Quick 1-Click Credentials Sign-In */}
-        <div className="mt-6 pt-5 border-t border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold text-center mb-3">
-            Quick 1-Click Sign-In
+        {/* Admin Quick Fill */}
+        <div className="mt-5 pt-4 border-t border-slate-800 space-y-2">
+          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold text-center mb-2">
+            Administrator Access
           </div>
 
-          <div className="space-y-2">
-            {/* KhaderMeeran Admin Button */}
-            <button
-              type="button"
-              onClick={handleAdminFill}
-              className="w-full py-2.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between transition-colors shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-amber-400" />
-                <span>KhaderMeeran (Admin)</span>
-              </div>
-              <span className="text-[10px] font-mono text-amber-400/80">Admin@123 (Fill)</span>
-            </button>
+          <button
+            type="button"
+            onClick={handleAdminFill}
+            className="w-full py-2.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between transition-colors shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-amber-400" />
+              <span>KhaderMeeran (Admin)</span>
+            </div>
+            <span className="text-[10px] font-mono text-amber-400/80">Fill Credentials</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('team1@demo.com')}
-              className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                <span>Coastal Kings (CK)</span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400">team1@demo.com</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('team2@demo.com')}
-              className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                <span>Capital Warriors (CW)</span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-400">team2@demo.com</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSuccess()}
-              className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors mt-2"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Continue as Spectator (No Login Required)</span>
-            </button>
-          </div>
+          <p className="text-[11px] text-slate-500 text-center pt-1 leading-relaxed">
+            Franchise owners sign in using the custom login credentials configured by the commissioner in the Admin table.
+          </p>
         </div>
       </div>
 
