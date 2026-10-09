@@ -1,3 +1,5 @@
+import { INITIAL_PLAYERS, INITIAL_TEAMS } from '../data/initial-data';
+
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined') {
     // 1. User manual override from UI settings modal
@@ -76,18 +78,29 @@ class ApiService {
 
   // Players
   async getPlayers(params?: Record<string, string>) {
-    const query = new URLSearchParams(params).toString();
-    const res = await fetch(`${getApiBaseUrl()}/players${query ? `?${query}` : ''}`, {
-      headers: this.getHeaders(),
-    });
-    return this.handleResponse<any[]>(res);
+    try {
+      const query = new URLSearchParams(params).toString();
+      const res = await fetch(`${getApiBaseUrl()}/players${query ? `?${query}` : ''}`, {
+        headers: this.getHeaders(),
+      });
+      return await this.handleResponse<any[]>(res);
+    } catch (err) {
+      console.warn('Backend /players unreachable. Serving fallback registry pool.');
+      return INITIAL_PLAYERS;
+    }
   }
 
   async getPlayerById(id: string) {
-    const res = await fetch(`${getApiBaseUrl()}/players/${id}`, {
-      headers: this.getHeaders(),
-    });
-    return this.handleResponse<any>(res);
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/players/${id}`, {
+        headers: this.getHeaders(),
+      });
+      return await this.handleResponse<any>(res);
+    } catch (err) {
+      const fallback = INITIAL_PLAYERS.find((p) => p.id === id);
+      if (fallback) return fallback;
+      throw err;
+    }
   }
 
   async createPlayer(data: any) {
@@ -118,10 +131,15 @@ class ApiService {
 
   // Teams
   async getTeams() {
-    const res = await fetch(`${getApiBaseUrl()}/teams`, {
-      headers: this.getHeaders(),
-    });
-    return this.handleResponse<any[]>(res);
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/teams`, {
+        headers: this.getHeaders(),
+      });
+      return await this.handleResponse<any[]>(res);
+    } catch (err) {
+      console.warn('Backend /teams unreachable. Serving fallback franchise pool.');
+      return INITIAL_TEAMS;
+    }
   }
 
   async getTeamById(id: string) {
@@ -268,6 +286,73 @@ class ApiService {
   async getDashboardStats() {
     const res = await fetch(`${getApiBaseUrl()}/auction/stats`, {
       headers: this.getHeaders(),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Public Player Registration
+  async registerPlayerPublic(data: any) {
+    const res = await fetch(`${getApiBaseUrl()}/players/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Admin Reset Password
+  async resetPassword(newPassword: string, currentPassword?: string) {
+    const res = await fetch(`${getApiBaseUrl()}/auth/reset-password`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ newPassword, currentPassword }),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Admin Auction Settings
+  async updateAuctionSettings(settings: any) {
+    const res = await fetch(`${getApiBaseUrl()}/auction/settings`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(settings),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Team Management
+  async createTeam(data: any) {
+    const res = await fetch(`${getApiBaseUrl()}/teams`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  async deleteTeam(id: string) {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  // Icon Player Assignment
+  async assignIconPlayer(teamId: string, playerId: string, iconPrice?: number) {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${teamId}/assign-icon`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ playerId, iconPrice }),
+    });
+    return this.handleResponse<any>(res);
+  }
+
+  async removeIconPlayer(teamId: string, playerId: string) {
+    const res = await fetch(`${getApiBaseUrl()}/teams/${teamId}/remove-icon`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ playerId }),
     });
     return this.handleResponse<any>(res);
   }

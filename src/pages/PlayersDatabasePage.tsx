@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Plus, Globe, Award, Info, Trash2, Edit } from 'lucide-react';
+import { Search, Filter, Plus, Globe, Award, Info, Trash2, Edit, Star, MapPin } from 'lucide-react';
 import { api } from '../services/api';
 import { Player } from '../types';
 import { formatRupees } from '../utils/currency';
@@ -26,15 +26,15 @@ export const PlayersDatabasePage: React.FC = () => {
     role: 'Batter',
     battingStyle: 'Right-hand bat',
     bowlingStyle: 'Right-arm medium',
-    basePrice: 10000000,
-    category: 'Capped',
-    matches: 25,
-    runs: 600,
-    battingAvg: 30,
-    strikeRate: 135,
+    basePrice: 100,
+    category: 'Local',
+    matches: 10,
+    runs: 250,
+    battingAvg: 25,
+    strikeRate: 125,
     wickets: 0,
     economy: 0,
-    highestScore: 75,
+    highestScore: 54,
   });
 
   const isAdmin = user?.role === 'ADMIN';
@@ -53,7 +53,14 @@ export const PlayersDatabasePage: React.FC = () => {
   }, []);
 
   const filteredPlayers = players.filter((p) => {
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      const matchName = p.name.toLowerCase().includes(q);
+      const sNoStr = String(p.sNo || '');
+      const matchSNo = sNoStr === q || sNoStr.includes(q) || `sno ${sNoStr}`.includes(q) || `#${sNoStr}`.includes(q);
+      const matchPlace = p.place ? p.place.toLowerCase().includes(q) : false;
+      if (!matchName && !matchSNo && !matchPlace) return false;
+    }
     if (roleFilter !== 'ALL' && p.role !== roleFilter) return false;
     if (categoryFilter !== 'ALL' && p.category !== categoryFilter) return false;
     if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
@@ -72,7 +79,11 @@ export const PlayersDatabasePage: React.FC = () => {
   };
 
   const handleDeletePlayer = async (id: string) => {
-    if (!window.confirm('Delete this player?')) return;
+    if (!isAdmin) {
+      alert('Only Admin can delete players.');
+      return;
+    }
+    if (!window.confirm('Delete this player permanently? Only Admin has permission.')) return;
     try {
       await api.deletePlayer(id);
       loadPlayers();
@@ -107,11 +118,11 @@ export const PlayersDatabasePage: React.FC = () => {
 
       {/* Filter and Search Bar */}
       <div className="bg-[#121724] border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Search player name..."
+            placeholder="Search by Player Name, S.No (e.g. 1) or Place..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -174,9 +185,17 @@ export const PlayersDatabasePage: React.FC = () => {
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold uppercase">
-                    {p.category}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-black">
+                      S.No #{p.sNo || '-'}
+                    </span>
+                    {p.isIcon && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-bold flex items-center gap-0.5 shadow-sm">
+                        <Star className="w-2.5 h-2.5 fill-yellow-400" />
+                        ICON
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
                       p.status === 'SOLD'
@@ -211,7 +230,7 @@ export const PlayersDatabasePage: React.FC = () => {
                       <span className="text-slate-300 font-medium">{p.role}</span>
                     </div>
                     <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                      Age {p.age} {p.isOverseas && '• Overseas'}
+                      Age {p.age} {p.place && `• ${p.place}`}
                     </div>
                   </div>
                 </div>

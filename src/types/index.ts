@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   email: string;
+  username?: string | null;
   name: string;
   role: 'ADMIN' | 'TEAM' | 'SPECTATOR';
   teamId?: string | null;
@@ -9,16 +10,22 @@ export interface User {
 
 export interface Player {
   id: string;
+  sNo: number;
   name: string;
   profileImage: string;
   country: string;
   isOverseas: boolean;
   age: number;
-  role: 'Batter' | 'Bowler' | 'All-Rounder' | 'Wicketkeeper';
+  dob?: string | null;
+  place?: string | null;
+  phone?: string | null;
+  role: 'Batter' | 'Bowler' | 'All-Rounder' | 'Wicketkeeper' | string;
   battingStyle: string;
   bowlingStyle: string;
   basePrice: number;
   category: string;
+  isIcon?: boolean;
+  iconPrice?: number | null;
   matches: number;
   runs: number;
   battingAvg: number;
@@ -33,6 +40,7 @@ export interface Player {
   teamPlayer?: {
     team: Team;
     price: number;
+    isIcon?: boolean;
   } | null;
   bids?: Bid[];
   auctionPlayers?: AuctionPlayer[];
@@ -42,6 +50,9 @@ export interface Team {
   id: string;
   name: string;
   shortName: string;
+  ownerName?: string | null;
+  phone?: string | null;
+  address?: string | null;
   primaryColor: string;
   secondaryColor: string;
   logoText: string;
@@ -50,6 +61,7 @@ export interface Team {
   maxSquadSize: number;
   maxOverseas: number;
   squadSize?: number;
+  iconPlayersCount?: number;
   overseasCount?: number;
   batters?: number;
   bowlers?: number;
@@ -61,6 +73,7 @@ export interface Team {
   squad?: Array<{
     id: string;
     price: number;
+    isIcon?: boolean;
     player: Player;
   }>;
 }
@@ -71,6 +84,12 @@ export interface Auction {
   status: 'IDLE' | 'ACTIVE' | 'PAUSED' | 'COMPLETED';
   currentRound: number;
   defaultTimerSec: number;
+  autoSell?: boolean;
+  timerEnabled?: boolean;
+  defaultPurse?: number;
+  defaultSquadLimit?: number;
+  iconPlayerPrice?: number;
+  defaultBasePrice?: number;
   activePlayerId?: string | null;
   activePlayerPrice?: number | null;
   highestBidTeamId?: string | null;
@@ -100,9 +119,18 @@ export interface Bid {
   playerId: string;
   player?: Player;
   teamId: string;
-  team: Team;
+  team?: Team;
   amount: number;
   bidNumber: number;
+  createdAt: string;
+}
+
+export interface AuctionEvent {
+  id: string;
+  auctionId: string;
+  type: string;
+  message: string;
+  metadata?: string | null;
   createdAt: string;
 }
 
@@ -111,9 +139,10 @@ export interface AuctionState {
   activePlayer: Player | null;
   highestBidTeam: Team | null;
   currentBid: number;
-  teams: Team[];
+  secondsLeft?: number;
   recentBids: Bid[];
-  minIncrement: number;
+  teams: Team[];
+  minIncrement?: number;
 }
 
 export interface DashboardStats {
@@ -124,30 +153,16 @@ export interface DashboardStats {
     remainingCount: number;
     totalSpent: number;
     avgPrice: number;
-    highestPurchase: AuctionPlayer | null;
+    highestPurchase?: {
+      finalPrice: number;
+      player: Player;
+      winningTeam: Team;
+    } | null;
   };
-  spendingByTeam: Array<{
-    name: string;
-    shortName: string;
-    color: string;
-    totalSpent: number;
-    remainingPurse: number;
-    squadCount: number;
-    overseasCount: number;
-  }>;
-  soldByRole: Array<{
-    role: string;
-    count: number;
-  }>;
-  soldByCountry: Array<{
-    country: string;
-    count: number;
-  }>;
-  priceDistribution: Array<{
-    label: string;
-    min: number;
-    max: number;
-    count: number;
-  }>;
-  recentPurchases: AuctionPlayer[];
+  spendingByTeam: any[];
+  soldByRole: any[];
+  soldByCountry: any[];
+  priceDistribution: any[];
+  recentPurchases: any[];
 }
+

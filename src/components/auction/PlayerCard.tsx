@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, Award, Shield, Zap, Target, Flame, Info } from 'lucide-react';
+import { Globe, Award, Shield, Zap, Target, Flame, Info, Star, MapPin, Calendar } from 'lucide-react';
 import { Player } from '../../types';
 import { formatRupees } from '../../utils/currency';
 
@@ -36,9 +36,17 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onViewProfile })
     <div className="bg-[#121724]/95 border border-slate-800/90 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col backdrop-blur-md">
       {/* Top Banner Tag */}
       <div className="px-5 py-2.5 bg-gradient-to-r from-slate-900 via-[#182033] to-slate-900 border-b border-slate-800 flex items-center justify-between">
-        <span className="text-[11px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
-          PLAYER LOT #{player.id.substring(0, 6)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-black">
+            S.No: #{player.sNo || 1}
+          </span>
+          {player.isIcon && (
+            <span className="px-2 py-0.5 rounded-lg bg-yellow-500/25 border border-yellow-500/50 text-yellow-300 font-bold text-[10px] flex items-center gap-1 shadow-sm">
+              <Star className="w-3 h-3 fill-yellow-400" />
+              ICON PLAYER
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {player.isOverseas ? (
             <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
@@ -88,6 +96,24 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onViewProfile })
                 {player.role}
               </span>
             </div>
+
+            {/* Place / DOB / Local details */}
+            {(player.place || player.dob) && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-400">
+                {player.place && (
+                  <span className="flex items-center gap-1 text-slate-300 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800">
+                    <MapPin className="w-3 h-3 text-amber-400" />
+                    {player.place}
+                  </span>
+                )}
+                {player.dob && (
+                  <span className="flex items-center gap-1 text-slate-300 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800">
+                    <Calendar className="w-3 h-3 text-cyan-400" />
+                    {player.dob}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="mt-3 text-xs text-slate-400 space-y-0.5">
               <div className="flex items-center gap-1 truncate">

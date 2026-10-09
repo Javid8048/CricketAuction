@@ -9,11 +9,26 @@ import { PlayersDatabasePage } from './pages/PlayersDatabasePage';
 import { TeamsDatabasePage } from './pages/TeamsDatabasePage';
 import { AuctionHistoryPage } from './pages/AuctionHistoryPage';
 import { LoginPage } from './pages/LoginPage';
+import { PlayerRegisterPage } from './components/player/PlayerRegisterPage';
+import { AdminSettingsModal } from './components/admin/AdminSettingsModal';
+import { IconPlayerModal } from './components/admin/IconPlayerModal';
+import { TeamFormModal } from './components/admin/TeamFormModal';
+import { RenderWakeupModal } from './components/common/RenderWakeupModal';
 import { useAuctionStore } from './store/auction.store';
 import { useAuthStore } from './store/auth.store';
 
 export function App() {
-  const [currentTab, setCurrentTab] = useState<string>('arena');
+  const getInitialTab = () => {
+    if (window.location.hash === '#register') return 'register';
+    return 'arena';
+  };
+
+  const [currentTab, setCurrentTab] = useState<string>(getInitialTab());
+  const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
+  const [isIconModalOpen, setIsIconModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isRenderWakeupOpen, setIsRenderWakeupOpen] = useState(false);
+
   const { initState, initSocketListeners } = useAuctionStore();
   const { checkAuth } = useAuthStore();
 
@@ -21,23 +36,78 @@ export function App() {
     checkAuth();
     initState();
     initSocketListeners();
+
+    const handleHashChange = () => {
+      if (window.location.hash === '#register') {
+        setCurrentTab('register');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, [checkAuth, initState, initSocketListeners]);
+
+  const handleTabChange = (tab: string) => {
+    setCurrentTab(tab);
+    if (tab === 'register') {
+      window.location.hash = 'register';
+    } else if (window.location.hash === '#register') {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
       {/* Broadcast Navbar */}
-      <Navbar currentTab={currentTab} onSelectTab={(tab) => setCurrentTab(tab)} />
+      <Navbar
+        currentTab={currentTab}
+        onSelectTab={handleTabChange}
+        onOpenAdminSettings={() => setIsAdminSettingsOpen(true)}
+        onOpenIconModal={() => setIsIconModalOpen(true)}
+        onOpenTeamModal={() => setIsTeamModalOpen(true)}
+        onOpenRenderWakeup={() => setIsRenderWakeupOpen(true)}
+      />
 
       {/* Main Screen Content */}
-      <main className="flex-1 pb-12">
+      <main className="flex-1 pb-20 lg:pb-12">
         {currentTab === 'arena' && <LiveAuctionPage />}
         {currentTab === 'players' && <PlayersDatabasePage />}
         {currentTab === 'teams' && <TeamsDatabasePage />}
+        {currentTab === 'register' && (
+          <PlayerRegisterPage onBackToArena={() => handleTabChange('arena')} />
+        )}
         {currentTab === 'admin-dashboard' && <AdminDashboardPage />}
         {currentTab === 'team-dashboard' && <TeamDashboardPage />}
         {currentTab === 'history' && <AuctionHistoryPage />}
-        {currentTab === 'login' && <LoginPage onSuccess={() => setCurrentTab('arena')} />}
+        {currentTab === 'login' && (
+          <LoginPage
+            onSuccess={() => handleTabChange('arena')}
+            onOpenRegister={() => handleTabChange('register')}
+          />
+        )}
       </main>
+
+      {/* Modals */}
+      <AdminSettingsModal
+        isOpen={isAdminSettingsOpen}
+        onClose={() => setIsAdminSettingsOpen(false)}
+      />
+
+      <IconPlayerModal
+        isOpen={isIconModalOpen}
+        onClose={() => setIsIconModalOpen(false)}
+      />
+
+      <TeamFormModal
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+      />
+
+      <RenderWakeupModal
+        isOpen={isRenderWakeupOpen}
+        onClose={() => setIsRenderWakeupOpen(false)}
+        onSuccess={() => initState()}
+      />
 
       {/* Live Overlays & Toasts */}
       <SoldUnsoldBanner />
@@ -45,7 +115,7 @@ export function App() {
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-[#07090e] py-4 text-center text-xs text-slate-500 font-mono">
-        CRICKET AUCTION ARENA • Production Franchise Bidding Simulator • Real-time WebSocket Engine
+        CRICKET AUCTION ARENA • Local Tournament Edition • Purse: ₹15,000 • 12 Squad Limit • Real-time WebSocket Engine
       </footer>
     </div>
   );

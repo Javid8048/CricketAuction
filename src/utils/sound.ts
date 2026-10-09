@@ -7,7 +7,7 @@ class SoundEngine {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
 
-  private initCtx() {
+  public initCtx() {
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
@@ -17,6 +17,10 @@ class SoundEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+  }
+
+  public unlockAudio() {
+    this.initCtx();
   }
 
   // Play electronic bell chime when new bid is placed
@@ -177,3 +181,13 @@ class SoundEngine {
 }
 
 export const sound = new SoundEngine();
+
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    sound.unlockAudio();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+  };
+  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('keydown', unlock, { passive: true });
+}

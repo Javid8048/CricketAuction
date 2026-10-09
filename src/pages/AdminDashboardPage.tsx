@@ -151,15 +151,15 @@ export const AdminDashboardPage: React.FC = () => {
         {/* Spending by Team */}
         <div className="bg-[#121724] border border-slate-800 p-6 rounded-2xl">
           <h3 className="text-sm font-extrabold text-white font-display uppercase tracking-wider mb-4">
-            Total Expenditure by Franchise (₹ Crores)
+            Total Expenditure by Franchise (₹ Rupees)
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={spendingByTeam.map((t: any) => ({
                   name: t.shortName,
-                  spentCr: Number((t.totalSpent / CRORE).toFixed(2)),
-                  remainingCr: Number((t.remainingPurse / CRORE).toFixed(2)),
+                  spent: t.totalSpent || 0,
+                  remaining: t.remainingPurse || 0,
                 }))}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -167,9 +167,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155' }}
-                  formatter={(val: any) => [`₹${val} Cr`, '']}
+                  formatter={(val: any) => [formatRupees(Number(val)), '']}
                 />
-                <Bar dataKey="spentCr" fill="#f59e0b" name="Spent" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="spent" fill="#f59e0b" name="Spent" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

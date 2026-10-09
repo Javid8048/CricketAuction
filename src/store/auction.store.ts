@@ -5,7 +5,8 @@ import { socketService } from '../services/socket';
 import { api } from '../services/api';
 import { sound } from '../utils/sound';
 import { INITIAL_TEAMS, INITIAL_PLAYERS } from '../data/initial-data';
-import { getMinBidIncrement } from '../utils/currency';
+import { getMinBidIncrement, formatRupees } from '../utils/currency';
+import { useAuthStore } from './auth.store';
 
 interface SoldOverlay {
   player: Player;
@@ -83,9 +84,18 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
   startStandaloneTimer: () => {
     if (standaloneInterval) clearInterval(standaloneInterval);
+    const { state } = get();
+    if (!state || state.auction.status !== 'ACTIVE' || state.auction.timerEnabled === false) {
+      return;
+    }
+
     standaloneInterval = setInterval(() => {
-      const { secondsLeft, state } = get();
-      if (!state || state.auction.status !== 'ACTIVE') return;
+      const { secondsLeft, state: curState } = get();
+      if (!curState || curState.auction.status !== 'ACTIVE' || curState.auction.timerEnabled === false) {
+        clearInterval(standaloneInterval);
+        standaloneInterval = null;
+        return;
+      }
 
       const nextSec = secondsLeft - 1;
       set({
@@ -100,10 +110,16 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
       if (nextSec <= 0) {
         clearInterval(standaloneInterval);
         standaloneInterval = null;
-        if (state.highestBidTeam) {
-          get().adminActionStandalone('sell');
+        const autoSellEnabled = curState.auction.autoSell !== false;
+        if (autoSellEnabled) {
+          if (curState.highestBidTeam) {
+            get().adminActionStandalone('sell');
+          } else {
+            get().adminActionStandalone('unsold');
+          }
         } else {
-          get().adminActionStandalone('unsold');
+          sound.playTimerTick();
+          get().showToast('Timer ended! Waiting for Admin confirmation to Sell or Mark Unsold.', 'info');
         }
       }
     }, 1000);
@@ -144,6 +160,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         activePlayer: activeP,
         highestBidTeam: null,
         currentBid: activeP.basePrice,
+        secondsLeft: 10,
         teams: INITIAL_TEAMS,
         recentBids: [],
         minIncrement: getMinBidIncrement(activeP.basePrice),
@@ -236,7 +253,12 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         set({ lastBidFlash: false });
       }, 700);
 
-      get().showToast(`${data.teamName} bids ₹${(data.amount / 10000000).toFixed(2)} Cr!`, 'info');
+      get().showToast(`${data.teamName} bids ${formatRupees(data.amount)}!`, 'info');
+    });
+
+    socket.on('auction:timer_ended_manual', (data: { message: string }) => {
+      sound.playTimerTick();
+      get().showToast(data.message || 'Timer ended! Waiting for Admin confirmation to Sell or Mark Unsold.', 'info');
     });
 
     socket.on('auction:sold', (data: any) => {
@@ -324,11 +346,17 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
 
     try {
       const activeP = state.activePlayer;
-      const effectiveTeam = state.teams.find((t) => t.id === teamId) || state.teams[0];
+      const authTeamId = useAuthStore.getState().user?.teamId;
+      const targetTeamId = teamId || authTeamId;
+      const effectiveTeam = (targetTeamId ? state.teams.find((t) => t.id === targetTeamId) : null) || state.teams[0];
       const targetAmount = amount || (state.currentBid + getMinBidIncrement(state.currentBid));
 
+      if (activeP.isOverseas && (effectiveTeam.overseasCount || 0) >= effectiveTeam.maxOverseas) {
+        throw new Error(`Overseas limit reached (${effectiveTeam.maxOverseas} max). Cannot bid on overseas player.`);
+      }
+
       if (effectiveTeam.remainingPurse < targetAmount) {
-        throw new Error('Insufficient purse for this bid.');
+        throw new Error(`Insufficient purse. Team has ${formatRupees(effectiveTeam.remainingPurse)} remaining.`);
       }
 
       const newBid: Bid = {
@@ -365,7 +393,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
       });
 
       sound.playBidChime();
-      get().showToast(`${effectiveTeam.name} bids ₹${(targetAmount / 10000000).toFixed(2)} Cr!`, 'info');
+      get().showToast(`${effectiveTeam.name} bids ${formatRupees(targetAmount)}!`, 'info');
 
       setTimeout(() => set({ lastBidFlash: false }), 600);
       get().startStandaloneTimer();
@@ -374,9 +402,9 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
       setTimeout(() => {
         const cur = get().state;
         if (!cur || cur.auction.status !== 'ACTIVE' || !cur.highestBidTeam) return;
-        if (cur.highestBidTeam.id === effectiveTeam.id && targetAmount < 140000000) {
+        if (cur.highestBidTeam.id === effectiveTeam.id && targetAmount < 14000) {
           // Rival team (pick another team)
-          const rivalTeam = cur.teams.find((t) => t.id !== effectiveTeam.id && t.remainingPurse > targetAmount + 2000000);
+          const rivalTeam = cur.teams.find((t) => t.id !== effectiveTeam.id && t.remainingPurse > targetAmount + 200);
           if (rivalTeam) {
             const rivalBidAmount = targetAmount + getMinBidIncrement(targetAmount);
             const rivalBid: Bid = {
@@ -409,7 +437,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
             });
 
             sound.playBidChime();
-            get().showToast(`Counter-bid! ${rivalTeam.name} bids ₹${(rivalBidAmount / 10000000).toFixed(2)} Cr!`, 'info');
+            get().showToast(`Counter-bid! ${rivalTeam.name} bids ${formatRupees(rivalBidAmount)}!`, 'info');
             setTimeout(() => set({ lastBidFlash: false }), 600);
             get().startStandaloneTimer();
           }
@@ -469,7 +497,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
           player,
           winningTeam,
           finalPrice,
-          formattedPrice: `₹${(finalPrice / 10000000).toFixed(2)} Cr`,
+          formattedPrice: formatRupees(finalPrice),
         },
       });
 
@@ -495,7 +523,7 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
         unsoldOverlay: {
           player,
           basePrice: player.basePrice,
-          formattedBasePrice: `₹${(player.basePrice / 10000000).toFixed(2)} Cr`,
+          formattedBasePrice: formatRupees(player.basePrice),
         },
       });
 
@@ -561,6 +589,34 @@ export const useAuctionStore = create<AuctionStore>((set, get) => ({
       });
       get().showToast('Auction reset to pristine state', 'info');
       get().startStandaloneTimer();
+    } else if (action === 'select_player' && payload) {
+      get().stopStandaloneTimer();
+      set({ soldOverlay: null, unsoldOverlay: null });
+      const targetP = INITIAL_PLAYERS.find((p) => p.id === payload) || state.activePlayer;
+      if (targetP) {
+        set({
+          state: {
+            ...state,
+            activePlayer: targetP,
+            currentBid: targetP.basePrice,
+            highestBidTeam: null,
+            recentBids: [],
+            minIncrement: getMinBidIncrement(targetP.basePrice),
+            auction: {
+              ...state.auction,
+              activePlayerId: targetP.id,
+              activePlayerPrice: targetP.basePrice,
+              highestBidTeamId: null,
+              status: 'ACTIVE',
+            },
+          },
+          secondsLeft: 10,
+          isTimerWarning: false,
+          isTimerUrgent: false,
+        });
+        get().showToast(`Player on block: ${targetP.name}`, 'info');
+        get().startStandaloneTimer();
+      }
     }
   },
 }));

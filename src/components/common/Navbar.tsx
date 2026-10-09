@@ -1,5 +1,22 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Shield, Users, Radio, UserCheck, ChevronDown, Trophy, LogOut, Flame, Server } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  Shield,
+  Users,
+  Radio,
+  UserCheck,
+  ChevronDown,
+  Trophy,
+  LogOut,
+  Flame,
+  Server,
+  History,
+  Settings,
+  Star,
+  UserPlus,
+  Activity,
+} from 'lucide-react';
 import { useAuthStore } from '../../store/auth.store';
 import { useAuctionStore } from '../../store/auction.store';
 import { formatRupees } from '../../utils/currency';
@@ -9,9 +26,20 @@ interface NavbarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   onOpenPlayerModal?: (playerId: string) => void;
+  onOpenAdminSettings?: () => void;
+  onOpenIconModal?: () => void;
+  onOpenTeamModal?: () => void;
+  onOpenRenderWakeup?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentTab,
+  onSelectTab,
+  onOpenAdminSettings,
+  onOpenIconModal,
+  onOpenTeamModal,
+  onOpenRenderWakeup,
+}) => {
   const { user, logout, quickLogin } = useAuthStore();
   const { state, isConnected, soundMuted, toggleSound } = useAuctionStore();
   const [showDemoMenu, setShowDemoMenu] = useState(false);
@@ -22,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
 
   // Demo accounts options for instant testing
   const demoAccounts = [
-    { label: 'Admin (Auctioneer)', email: 'admin@demo.com', role: 'ADMIN', color: '#f59e0b' },
+    { label: 'KhaderMeeran (Admin)', email: 'KhaderMeeran', role: 'ADMIN', color: '#f59e0b' },
     { label: 'Coastal Kings (CK)', email: 'team1@demo.com', role: 'TEAM', color: '#eab308' },
     { label: 'Capital Warriors (CW)', email: 'team2@demo.com', role: 'TEAM', color: '#ef4444' },
     { label: 'Southern Strikers (SS)', email: 'team3@demo.com', role: 'TEAM', color: '#06b6d4' },
@@ -101,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              Players (50)
+              Players ({state?.teams ? '50+' : 'Pool'})
             </button>
 
             <button
@@ -113,6 +141,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
               }`}
             >
               Franchises (8)
+            </button>
+
+            {/* Public Player Registration Tab */}
+            <button
+              onClick={() => onSelectTab('register')}
+              className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                currentTab === 'register'
+                  ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30'
+                  : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+              }`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Player Form</span>
             </button>
 
             {user?.role === 'ADMIN' && (
@@ -156,8 +197,44 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
           </nav>
         </div>
 
-        {/* Right Side: Demo Account Switcher, Sound, User Info */}
-        <div className="flex items-center gap-3">
+        {/* Right Side: Quick Modals, Server, Sound, User Info */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Render Cloud Wakeup timer trigger */}
+          {onOpenRenderWakeup && (
+            <button
+              onClick={onOpenRenderWakeup}
+              title="Render Cloud DB Health & Countdown Timer"
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 hover:bg-slate-700/80 transition-colors border border-slate-700/60 flex items-center gap-1.5 text-xs font-mono"
+            >
+              <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="hidden xl:inline text-[11px] font-semibold text-slate-300">DB Status</span>
+            </button>
+          )}
+
+          {/* Admin Quick Action Buttons */}
+          {user?.role === 'ADMIN' && (
+            <div className="flex items-center gap-1">
+              {onOpenAdminSettings && (
+                <button
+                  onClick={onOpenAdminSettings}
+                  title="Tournament & Auction Settings (Auto-Sell, Timer, Purse)"
+                  className="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-amber-400 hover:bg-slate-700/80 transition-colors border border-slate-700/60"
+                >
+                  <Settings className="w-4 h-4 text-amber-400" />
+                </button>
+              )}
+              {onOpenIconModal && (
+                <button
+                  onClick={onOpenIconModal}
+                  title="Manage Icon Players (2 Max, ₹2,500)"
+                  className="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-yellow-400 hover:bg-slate-700/80 transition-colors border border-slate-700/60"
+                >
+                  <Star className="w-4 h-4 text-yellow-400" />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Server / Backend Config */}
           <button
             onClick={() => setShowServerModal(true)}
@@ -183,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-xs font-medium text-slate-200 transition-colors"
             >
               <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Switch Demo Role</span>
+              <span className="hidden sm:inline">Switch Role</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
@@ -248,7 +325,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                 </div>
               ) : (
                 <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-xs font-bold text-amber-300">AUCTIONEER ADMIN</span>
+                  <span className="text-xs font-bold text-amber-300">KhaderMeeran (Admin)</span>
                   <span className="text-[11px] text-slate-400 font-mono">Commission Control</span>
                 </div>
               )}
@@ -287,7 +364,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
             </div>
 
             <p className="text-xs text-slate-300 mb-4 leading-relaxed">
-              GitHub Pages hosts the frontend client. To sync bids live across multiple devices/tabs in real-time, connect your deployed backend URL (Render, Railway, Codespaces, or localhost).
+              Connect your deployed backend URL (Render, Railway, or local IP). If offline, standalone simulation keeps running seamlessly.
             </p>
 
             <div className="space-y-3 mb-6">
@@ -299,16 +376,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                   type="text"
                   value={serverUrlInput}
                   onChange={(e) => setServerUrlInput(e.target.value)}
-                  placeholder="e.g. https://cricket-auction-backend.onrender.com"
+                  placeholder="e.g. https://cricketauctionbackend-ypoh.onrender.com"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
                 />
               </div>
 
               <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 space-y-1">
                 <div className="font-semibold text-slate-300">Quick options:</div>
-                <div>• <code className="text-amber-400">Render Free Cloud</code>: Connect your Render web service URL</div>
-                <div>• <code className="text-cyan-400">http://localhost:5000</code>: Local development server</div>
-                <div>• <code className="text-emerald-400">Standalone Mode</code>: Runs 100% in browser with smart simulation</div>
+                <div>• <code className="text-amber-400">https://cricketauctionbackend-ypoh.onrender.com</code></div>
+                <div>• <code className="text-cyan-400">http://192.168.29.136:5000</code> or <code className="text-cyan-400">http://localhost:5000</code></div>
+                <div>• <code className="text-emerald-400">Standalone Mode</code>: Runs 100% in browser with simulation</div>
               </div>
             </div>
 
@@ -355,6 +432,97 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Navigation Bar (Screens < lg) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c101a]/95 backdrop-blur-xl border-t border-slate-800/90 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+        <button
+          onClick={() => onSelectTab('arena')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+            currentTab === 'arena'
+              ? 'text-amber-400 font-bold bg-amber-500/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Radio className="w-4 h-4" />
+          <span>Arena</span>
+        </button>
+
+        <button
+          onClick={() => onSelectTab('players')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+            currentTab === 'players'
+              ? 'text-amber-400 font-bold bg-amber-500/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Players</span>
+        </button>
+
+        <button
+          onClick={() => onSelectTab('teams')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+            currentTab === 'teams'
+              ? 'text-amber-400 font-bold bg-amber-500/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Trophy className="w-4 h-4" />
+          <span>Teams</span>
+        </button>
+
+        <button
+          onClick={() => onSelectTab('register')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+            currentTab === 'register'
+              ? 'text-emerald-400 font-bold bg-emerald-500/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <UserPlus className="w-4 h-4 text-emerald-400" />
+          <span>Register</span>
+        </button>
+
+        {user?.role === 'ADMIN' && (
+          <button
+            onClick={() => onSelectTab('admin-dashboard')}
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+              currentTab === 'admin-dashboard'
+                ? 'text-amber-400 font-bold bg-amber-500/10'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span>Admin</span>
+          </button>
+        )}
+
+        {user?.role === 'TEAM' && (
+          <button
+            onClick={() => onSelectTab('team-dashboard')}
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+              currentTab === 'team-dashboard'
+                ? 'text-cyan-400 font-bold bg-cyan-500/10'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Trophy className="w-4 h-4" />
+            <span>Squad</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => onSelectTab('history')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl text-[10px] font-semibold transition-colors ${
+            currentTab === 'history'
+              ? 'text-amber-400 font-bold bg-amber-500/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>History</span>
+        </button>
+      </nav>
     </header>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Timer, ArrowUpRight, ShieldAlert, Sparkles, Check, AlertCircle } from 'lucide-react';
 import { useAuctionStore } from '../../store/auction.store';
 import { useAuthStore } from '../../store/auth.store';
-import { formatRupees, LAKH, CRORE } from '../../utils/currency';
+import { formatRupees } from '../../utils/currency';
 
 export const LiveBiddingArea: React.FC = () => {
   const {
@@ -29,20 +29,25 @@ export const LiveBiddingArea: React.FC = () => {
   const isTeamUser = user?.role === 'TEAM';
   const isAdmin = user?.role === 'ADMIN';
   const isHighestBidder = userTeam && highestBidTeam?.id === userTeam.id;
+  const isOverseasLimitReached = Boolean(activePlayer?.isOverseas && userTeam && (userTeam.overseasCount || 0) >= userTeam.maxOverseas);
 
-  // Bid increment amounts
-  const standardIncrements = [
-    { label: '+ ₹10 Lakh', amount: 10 * LAKH },
-    { label: '+ ₹20 Lakh', amount: 20 * LAKH },
-    { label: '+ ₹50 Lakh', amount: 50 * LAKH },
-    { label: '+ ₹1 Crore', amount: 1 * CRORE },
-  ];
+  // Dynamic tournament increment amounts (+ ₹100, + ₹200, + ₹500, + ₹1,000)
+  const getDynamicIncrements = () => {
+    return [
+      { label: '+ ₹100', amount: 100 },
+      { label: '+ ₹200', amount: 200 },
+      { label: '+ ₹500', amount: 500 },
+      { label: '+ ₹1,000', amount: 1000 },
+    ];
+  };
+
+  const standardIncrements = getDynamicIncrements();
 
   const handleStandardBid = async (inc: number) => {
     setBiddingError(null);
     try {
       const nextAmount = currentBid + inc;
-      await placeBid(nextAmount);
+      await placeBid(nextAmount, userTeam?.id);
     } catch (err: any) {
       setBiddingError(err.message);
     }
@@ -51,7 +56,7 @@ export const LiveBiddingArea: React.FC = () => {
   const handleBaseBid = async () => {
     setBiddingError(null);
     try {
-      await placeBid();
+      await placeBid(undefined, userTeam?.id);
     } catch (err: any) {
       setBiddingError(err.message);
     }
@@ -60,15 +65,14 @@ export const LiveBiddingArea: React.FC = () => {
   const handleCustomBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBiddingError(null);
-    const parsed = parseFloat(customBidInput);
-    if (isNaN(parsed) || parsed <= 0) {
-      setBiddingError('Please enter a valid bid amount in Crores (e.g. 8.5 for ₹8.50 Cr).');
+    const parsed = parseInt(customBidInput, 10);
+    if (isNaN(parsed) || parsed <= currentBid) {
+      setBiddingError(`Please enter a valid bid amount greater than current bid (${formatRupees(currentBid)}).`);
       return;
     }
 
-    const inRupees = parsed * CRORE;
     try {
-      await placeBid(inRupees);
+      await placeBid(parsed, userTeam?.id);
       setCustomBidInput('');
     } catch (err: any) {
       setBiddingError(err.message);
@@ -100,15 +104,23 @@ export const LiveBiddingArea: React.FC = () => {
           <div className="flex items-center gap-3 bg-[#171f33] px-4 py-2 rounded-2xl border border-slate-700/60 shadow-inner">
             <Timer
               className={`w-5 h-5 ${
-                isTimerUrgent ? 'text-rose-400 animate-spin' : isTimerWarning ? 'text-amber-400' : 'text-emerald-400'
+                auction?.timerEnabled === false
+                  ? 'text-slate-400'
+                  : isTimerUrgent
+                  ? 'text-rose-400 animate-spin'
+                  : isTimerWarning
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
               }`}
             />
             <div className="flex flex-col items-center">
               <span className="text-[9px] font-mono tracking-widest text-slate-400 font-bold uppercase">
-                BID TIMER
+                {auction?.timerEnabled === false ? 'TIMER' : 'BID TIMER'}
               </span>
-              <span className={`text-2xl font-black font-mono tracking-widest transition-all ${timerStyle}`}>
-                00:{String(secondsLeft).padStart(2, '0')}
+              <span className={`text-2xl font-black font-mono tracking-widest transition-all ${
+                auction?.timerEnabled === false ? 'text-slate-400 text-lg' : timerStyle
+              }`}>
+                {auction?.timerEnabled === false ? 'MANUAL' : `00:${String(secondsLeft).padStart(2, '0')}`}
               </span>
             </div>
           </div>
@@ -211,12 +223,19 @@ export const LiveBiddingArea: React.FC = () => {
               </div>
             ) : null}
 
+            {isOverseasLimitReached && (
+              <div className="p-3 mb-3 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs flex items-center justify-center gap-2 font-semibold">
+                <ShieldAlert className="w-4 h-4 text-cyan-400" />
+                <span>Overseas Limit Reached ({userTeam?.maxOverseas} max). Cannot bid on overseas players.</span>
+              </div>
+            )}
+
             {/* Standard Increments Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
               {!highestBidTeam && (
                 <button
                   type="button"
-                  disabled={!isAuctionActive || isBidding}
+                  disabled={!isAuctionActive || isBidding || isOverseasLimitReached}
                   onClick={handleBaseBid}
                   className="col-span-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
                 >
@@ -229,7 +248,7 @@ export const LiveBiddingArea: React.FC = () => {
                 <button
                   key={btn.label}
                   type="button"
-                  disabled={!isAuctionActive || isBidding || isHighestBidder}
+                  disabled={!isAuctionActive || isBidding || isHighestBidder || isOverseasLimitReached}
                   onClick={() => handleStandardBid(btn.amount)}
                   className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700/80 hover:border-amber-500/50 text-white font-extrabold text-xs font-mono transition-all transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 shadow-sm"
                 >
@@ -243,23 +262,23 @@ export const LiveBiddingArea: React.FC = () => {
             <form onSubmit={handleCustomBidSubmit} className="flex gap-2">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-mono font-bold">
-                  ₹ Cr:
+                  ₹ :
                 </span>
                 <input
                   type="number"
-                  step="0.05"
-                  min="0.2"
+                  step="50"
+                  min={currentBid + 100}
                   value={customBidInput}
                   onChange={(e) => setCustomBidInput(e.target.value)}
-                  placeholder="e.g. 5.50 (for ₹5.50 Cr)"
-                  disabled={!isAuctionActive || isBidding || isHighestBidder}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50"
+                  placeholder={`Custom ₹ (min ${formatRupees(currentBid + 100)})`}
+                  disabled={!isAuctionActive || isBidding || isHighestBidder || isOverseasLimitReached}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={!isAuctionActive || isBidding || isHighestBidder || !customBidInput}
+                disabled={!isAuctionActive || isBidding || isHighestBidder || isOverseasLimitReached || !customBidInput}
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
                 Custom Bid

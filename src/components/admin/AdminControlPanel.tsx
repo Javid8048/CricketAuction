@@ -6,7 +6,7 @@ import { Player } from '../../types';
 import { formatRupees } from '../../utils/currency';
 
 export const AdminControlPanel: React.FC = () => {
-  const { state } = useAuctionStore();
+  const { state, isStandaloneMode, adminActionStandalone } = useAuctionStore();
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
@@ -17,13 +17,22 @@ export const AdminControlPanel: React.FC = () => {
     api.getPlayers().then(setAllPlayers).catch(console.error);
   }, [state?.auction?.activePlayerId]);
 
-  const handleAction = async (actionFn: () => Promise<any>, confirmMsg?: string) => {
+  const handleAction = async (actionKey: string, apiFn: () => Promise<any>, confirmMsg?: string, payload?: any) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     setLoadingAction(true);
     try {
-      await actionFn();
+      if (isStandaloneMode) {
+        await adminActionStandalone(actionKey, payload);
+      } else {
+        await apiFn();
+      }
     } catch (err: any) {
-      alert(err.message);
+      console.warn(`API call failed for ${actionKey}, falling back to standalone simulation:`, err);
+      try {
+        await adminActionStandalone(actionKey, payload);
+      } catch (fallbackErr: any) {
+        alert(fallbackErr.message || err.message);
+      }
     } finally {
       setLoadingAction(false);
     }
@@ -31,7 +40,7 @@ export const AdminControlPanel: React.FC = () => {
 
   const handleManualSelect = async () => {
     if (!selectedPlayerId) return;
-    handleAction(() => api.selectPlayer(selectedPlayerId));
+    handleAction('select_player', () => api.selectPlayer(selectedPlayerId), undefined, selectedPlayerId);
   };
 
   return (
@@ -79,7 +88,7 @@ export const AdminControlPanel: React.FC = () => {
         {/* START / PAUSE */}
         {auction?.status === 'ACTIVE' ? (
           <button
-            onClick={() => handleAction(() => api.pauseAuction())}
+            onClick={() => handleAction('pause', () => api.pauseAuction())}
             disabled={loadingAction}
             className="p-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex flex-col items-center gap-1.5 transition-all"
           >
@@ -88,7 +97,7 @@ export const AdminControlPanel: React.FC = () => {
           </button>
         ) : (
           <button
-            onClick={() => handleAction(() => api.startAuction())}
+            onClick={() => handleAction('start', () => api.startAuction())}
             disabled={loadingAction}
             className="p-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex flex-col items-center gap-1.5 transition-all"
           >
@@ -99,7 +108,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* START BIDDING TIMER */}
         <button
-          onClick={() => handleAction(() => api.startBidding())}
+          onClick={() => handleAction('start', () => api.startBidding())}
           disabled={loadingAction || !auction?.activePlayerId}
           className="p-3 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 text-xs font-bold flex flex-col items-center gap-1.5 transition-all disabled:opacity-40"
         >
@@ -109,7 +118,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* CONFIRM SOLD */}
         <button
-          onClick={() => handleAction(() => api.sellPlayer(), 'Manually confirm player as SOLD to highest bidder?')}
+          onClick={() => handleAction('sell', () => api.sellPlayer(), 'Manually confirm player as SOLD to highest bidder?')}
           disabled={loadingAction || !auction?.activePlayerId}
           className="p-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex flex-col items-center gap-1.5 transition-all disabled:opacity-40"
         >
@@ -119,7 +128,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* MARK UNSOLD */}
         <button
-          onClick={() => handleAction(() => api.markUnsold(), 'Mark current player as UNSOLD?')}
+          onClick={() => handleAction('unsold', () => api.markUnsold(), 'Mark current player as UNSOLD?')}
           disabled={loadingAction || !auction?.activePlayerId}
           className="p-3 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-bold flex flex-col items-center gap-1.5 transition-all disabled:opacity-40"
         >
@@ -129,7 +138,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* NEXT PLAYER */}
         <button
-          onClick={() => handleAction(() => api.nextPlayer())}
+          onClick={() => handleAction('next', () => api.nextPlayer())}
           disabled={loadingAction}
           className="p-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-bold flex flex-col items-center gap-1.5 transition-all"
         >
@@ -139,7 +148,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* SKIP PLAYER */}
         <button
-          onClick={() => handleAction(() => api.skipPlayer(), 'Skip this player for now?')}
+          onClick={() => handleAction('next', () => api.skipPlayer(), 'Skip this player for now?')}
           disabled={loadingAction || !auction?.activePlayerId}
           className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold flex flex-col items-center gap-1.5 transition-all disabled:opacity-40"
         >
@@ -149,7 +158,7 @@ export const AdminControlPanel: React.FC = () => {
 
         {/* RE-AUCTION UNSOLD */}
         <button
-          onClick={() => handleAction(() => api.reauctionUnsold(), 'Initiate Round 2 for all UNSOLD players?')}
+          onClick={() => handleAction('start', () => api.reauctionUnsold(), 'Initiate Round 2 for all UNSOLD players?')}
           disabled={loadingAction}
           className="p-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-200 text-xs font-bold flex flex-col items-center gap-1.5 transition-all"
         >
@@ -161,6 +170,7 @@ export const AdminControlPanel: React.FC = () => {
         <button
           onClick={() =>
             handleAction(
+              'reset',
               () => api.resetAuction(),
               'WARNING: This will reset all team budgets, erase all bids, and revert all 50 players back to UPCOMING. Proceed?'
             )

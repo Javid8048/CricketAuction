@@ -25,8 +25,21 @@ export const SoldUnsoldBanner: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
 
+          {/* Animated Gavel Strike Icon */}
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-500/30 animate-bounce">
+              <svg className="w-9 h-9 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 13-7.5 7.5c-.8.8-2 .8-2.8 0s-.8-2 0-2.8L11.2 10.2" />
+                <path d="m16 16 6-6" />
+                <path d="m8 8 6-6" />
+                <path d="m9 7 8 8" />
+                <path d="m21 11-8-8" />
+              </svg>
+            </div>
+          </div>
+
           {/* SOLD Header */}
-          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold font-mono tracking-widest uppercase text-sm mb-6 animate-bounce">
+          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold font-mono tracking-widest uppercase text-sm mb-6">
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
             <span>PLAYER SOLD</span>
           </div>
